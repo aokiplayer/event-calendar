@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Event {
+  id          String       @id @default(cuid())
+  url         String
+  title       String
+  startDate   DateTime
+  endDate     DateTime
+  type        EventType
+  description String?
+  relatedUrls RelatedUrl[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model RelatedUrl {
+  id        String         @id @default(cuid())
+  url       String
+  urlType   RelatedUrlType
+  event     Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  createdAt DateTime       @default(now())
+}
+
+enum EventType {
+  SPEAKER
+  ATTENDEE
+}
+
+enum RelatedUrlType {
+  REPORT
+  SLIDES
+  VIDEO
+  OTHER
+}

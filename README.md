@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 参加・登壇・気になるイベント情報
 
-## Getting Started
+社内メンバーが参加・登壇するイベントを登録・共有するWebアプリ。
 
-First, run the development server:
+## 機能
+
+- イベントの登録・編集・削除
+- URL からタイトルを自動取得
+- カレンダー（月表示）で一覧確認
+- 登壇 / 参加の色分け表示
+- 関連URL（レポート・登壇資料・動画など）の複数登録
+- 簡易認証（全員共通のID/パスワード）
+
+## 技術スタック
+
+- [Next.js](https://nextjs.org/) (App Router)
+- [PostgreSQL](https://www.postgresql.org/) + [Prisma](https://www.prisma.io/)
+- [FullCalendar](https://fullcalendar.io/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [iron-session](https://github.com/vvo/iron-session)
+
+## ローカル開発
+
+### 必要なもの
+
+- Node.js 20 以上
+- Docker
+
+### 起動手順
 
 ```bash
+# 1. 依存パッケージのインストール
+npm install
+
+# 2. 環境変数の設定
+cp .env.example .env
+# .env を編集してください
+
+# 3. PostgreSQL 起動
+docker compose up -d
+
+# 4. DB の初期化
+npx prisma db push
+npx prisma generate
+
+# 5. 開発サーバー起動
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+http://localhost:3000 にアクセス。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 環境変数
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`.env.example` をコピーして `.env` を作成し、各値を設定してください。
 
-## Learn More
+| 変数名 | 説明 |
+|--------|------|
+| `DATABASE_URL` | PostgreSQL の接続文字列 |
+| `SITE_USERNAME` | ログインユーザー名 |
+| `SITE_PASSWORD` | ログインパスワード |
+| `SESSION_SECRET` | セッション暗号化キー（32文字以上） |
 
-To learn more about Next.js, take a look at the following resources:
+`SESSION_SECRET` の生成：
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+openssl rand -base64 32
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## デプロイ
 
-## Deploy on Vercel
+Vercel + Supabase を利用。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. [Supabase](https://supabase.com/) でプロジェクトを作成し、接続文字列を取得
+2. [Vercel](https://vercel.com/) に GitHub リポジトリを連携してデプロイ
+3. Vercel の環境変数に上記4つを設定
