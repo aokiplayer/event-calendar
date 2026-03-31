@@ -18,6 +18,7 @@ export default function CalendarPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [selectedDates, setSelectedDates] = useState<{ start: string; end: string } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const calendarRef = useRef<FullCalendar>(null);
 
   const fetchEvents = useCallback(async () => {
@@ -34,6 +35,9 @@ export default function CalendarPage() {
 
   useEffect(() => {
     fetchEvents();
+    fetch("/api/auth")
+      .then((r) => r.json())
+      .then((d) => setIsLoggedIn(d.isLoggedIn === true));
   }, [fetchEvents]);
 
   const calendarEvents = events.map((e) => ({
@@ -59,26 +63,37 @@ export default function CalendarPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-800">参加・登壇・気になるイベント情報</h1>
+        <h1 className="text-xl font-bold text-gray-800">参加・登壇イベント情報</h1>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              setSelectedDates(null);
-              setFormOpen(true);
-            }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            + イベント登録
-          </button>
-          <button
-            onClick={async () => {
-              await fetch("/api/auth", { method: "DELETE" });
-              router.push("/login");
-            }}
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            ログアウト
-          </button>
+          {isLoggedIn ? (
+            <>
+              <button
+                onClick={() => {
+                  setSelectedDates(null);
+                  setFormOpen(true);
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                + イベント登録
+              </button>
+              <button
+                onClick={async () => {
+                  await fetch("/api/auth", { method: "DELETE" });
+                  setIsLoggedIn(false);
+                }}
+                className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                ログアウト
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => router.push("/login")}
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              ログイン
+            </button>
+          )}
         </div>
       </header>
 
@@ -107,8 +122,8 @@ export default function CalendarPage() {
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             locale="ja"
-            selectable
-            select={handleDateSelect}
+            selectable={isLoggedIn}
+            select={isLoggedIn ? handleDateSelect : undefined}
             events={calendarEvents}
             eventClick={handleEventClick}
             headerToolbar={{
@@ -136,6 +151,7 @@ export default function CalendarPage() {
       {selectedEvent && (
         <EventDetailModal
           event={selectedEvent}
+          isLoggedIn={isLoggedIn}
           onClose={() => setSelectedEvent(null)}
           onDeleted={() => {
             setSelectedEvent(null);

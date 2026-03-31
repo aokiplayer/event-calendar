@@ -5,8 +5,15 @@ import { sessionOptions, type SessionData } from "@/lib/session";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ログインページと認証APIは保護しない
-  if (pathname === "/login" || pathname.startsWith("/api/auth")) {
+  // ログインページ・認証API・閲覧系は保護しない
+  const isPublic =
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth") ||
+    (pathname === "/" && req.method === "GET") ||
+    (pathname === "/api/events" && req.method === "GET") ||
+    (pathname.startsWith("/api/events/") && req.method === "GET");
+
+  if (isPublic) {
     return NextResponse.next();
   }
 

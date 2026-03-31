@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getIronSession } from "iron-session";
+import { sessionOptions, type SessionData } from "@/lib/session";
 
 const PRIVATE_IP_PATTERNS = [
   /^localhost$/i,
@@ -33,6 +35,12 @@ function isSafeUrl(urlString: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  const authRes = NextResponse.next();
+  const session = await getIronSession<SessionData>(req, authRes, sessionOptions);
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const url = req.nextUrl.searchParams.get("url");
   if (!url) {
     return NextResponse.json({ error: "Missing url" }, { status: 400 });

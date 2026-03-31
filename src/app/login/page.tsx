@@ -38,7 +38,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 w-full max-w-sm p-8">
         <h1 className="text-lg font-bold text-gray-800 mb-6 text-center">
-          参加・登壇・気になるイベント情報
+          参加・登壇イベント情報
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
