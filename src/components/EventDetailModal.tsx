@@ -7,6 +7,7 @@ import { EventFormModal } from "@/components/EventFormModal";
 
 type Props = {
   event: Event;
+  isLoggedIn: boolean;
   onClose: () => void;
   onDeleted: () => void;
   onUpdated: () => void;
@@ -21,7 +22,7 @@ function safeHref(url: string): string | undefined {
   }
 }
 
-export function EventDetailModal({ event, onClose, onDeleted, onUpdated }: Props) {
+export function EventDetailModal({ event, isLoggedIn, onClose, onDeleted, onUpdated }: Props) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
@@ -138,7 +139,7 @@ export function EventDetailModal({ event, onClose, onDeleted, onUpdated }: Props
           </p>
         )}
 
-        {confirmingDelete ? (
+        {isLoggedIn && confirmingDelete ? (
           <div className="px-6 py-4 border-t border-gray-200 bg-red-50 rounded-b-2xl">
             <p className="text-sm text-red-700 font-medium mb-3">このイベントを削除しますか？この操作は取り消せません。</p>
             <div className="flex justify-end gap-3">
@@ -160,19 +161,25 @@ export function EventDetailModal({ event, onClose, onDeleted, onUpdated }: Props
           </div>
         ) : (
           <div className="flex justify-between items-center px-6 py-4 border-t border-gray-200">
-            <button
-              onClick={() => setConfirmingDelete(true)}
-              className="text-sm text-red-500 hover:text-red-700 transition-colors"
-            >
-              削除
-            </button>
-            <div className="flex gap-3">
+            {isLoggedIn ? (
               <button
-                onClick={() => setEditing(true)}
-                className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                onClick={() => setConfirmingDelete(true)}
+                className="text-sm text-red-500 hover:text-red-700 transition-colors"
               >
-                編集
+                削除
               </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-3">
+              {isLoggedIn && (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  編集
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"

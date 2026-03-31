@@ -8,6 +8,12 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export async function GET(req: NextRequest) {
+  const res = NextResponse.next();
+  const session = await getIronSession<SessionData>(req, res, sessionOptions);
+  return NextResponse.json({ isLoggedIn: session.isLoggedIn === true });
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const parsed = loginSchema.safeParse(body);

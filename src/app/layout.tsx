@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "参加・登壇・気になるイベント情報",
+  title: "参加・登壇イベント情報",
   description: "社内イベント共有カレンダー",
 };
 

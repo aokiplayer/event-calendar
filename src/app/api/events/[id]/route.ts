@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getIronSession } from "iron-session";
+import { sessionOptions, type SessionData } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { eventSchema } from "@/lib/validation";
 
@@ -19,6 +21,12 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authRes = NextResponse.next();
+  const session = await getIronSession<SessionData>(req, authRes, sessionOptions);
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const body = await req.json();
   const parsed = eventSchema.safeParse(body);
@@ -48,9 +56,15 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authRes = NextResponse.next();
+  const session = await getIronSession<SessionData>(req, authRes, sessionOptions);
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   await prisma.event.delete({ where: { id } });
   return new NextResponse(null, { status: 204 });
