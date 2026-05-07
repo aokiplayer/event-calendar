@@ -85,6 +85,17 @@ Supabase 無料プランは7日間アクセスがないと DB が停止する。
 CRON_SECRET="openssl rand -hex 32 で生成したランダム文字列"
 ```
 
+## セキュリティ上の注意点
+
+### fetch-title API の SSRF 対策
+
+`/api/fetch-title` はユーザー指定の URL を fetch してタイトルを取得するため、SSRF（Server-Side Request Forgery）のリスクがある。以下の2段構えで対策している。
+
+1. **`isSafeUrl()`** — プライベート IP・ループバック・リンクローカルアドレスへのリクエストを弾く
+2. **`redirect: "error"`** — HTTP リダイレクトを一切追わない。`redirect: "follow"` にすると、攻撃者が外部 URL からプライベート IP へリダイレクトさせることで上記チェックをバイパスできるため禁止
+
+この設定を変更する場合は SSRF リスクを十分に考慮すること。
+
 ## DBスキーマ概要
 
 - `Event`: イベント本体（url, title, startDate, endDate, type, description）
