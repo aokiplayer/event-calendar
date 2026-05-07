@@ -5,10 +5,11 @@ import { sessionOptions, type SessionData } from "@/lib/session";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ログインページ・認証API・閲覧系は保護しない
+  // ログインページ・認証API・閲覧系・keepaliveは保護しない
   const isPublic =
     pathname === "/login" ||
     pathname.startsWith("/api/auth") ||
+    pathname === "/api/keepalive" ||
     (pathname === "/" && req.method === "GET") ||
     (pathname === "/api/events" && req.method === "GET") ||
     (pathname.startsWith("/api/events/") && req.method === "GET");
