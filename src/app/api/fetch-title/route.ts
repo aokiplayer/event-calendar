@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; EventCalendarBot/1.0)" },
       signal: AbortSignal.timeout(5000),
-      redirect: "follow",
+      redirect: "error",
     });
 
     if (!res.ok) {
