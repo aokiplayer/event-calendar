@@ -28,6 +28,8 @@ SITE_PASSWORD="password"
 SESSION_SECRET="32文字以上のランダムな文字列"
 ```
 
+本番（Vercel）では上記に加えて `CRON_SECRET` も設定すること（後述）。
+
 ## DB操作
 
 ```bash
@@ -47,6 +49,7 @@ src/
       auth/         # ログイン・ログアウト API
       events/       # イベント CRUD API
       fetch-title/  # URL からタイトル取得 API
+      keepalive/    # Supabase 停止防止用（Vercel Cron から呼び出し）
     login/          # ログインページ
     page.tsx        # カレンダーページ（メイン）
   components/
@@ -69,6 +72,18 @@ src/
 - **型の単一ソースは `validation.ts`**。`EventType` や `RelatedUrlType` は Zod スキーマから `z.infer<>` で推論し、`types/event.ts` に直書きしない
 - **Prisma 7 の接続**は `accelerateUrl` ではなく `@prisma/adapter-pg` の `adapter` オプションを使う
 - **スキーマ変更**は `prisma db push --accept-data-loss`（開発）または `prisma migrate dev`（本番）
+
+## Supabase 停止防止（Vercel Cron Job）
+
+Supabase 無料プランは7日間アクセスがないと DB が停止する。`vercel.json` に設定した Cron Job が毎日 0 時（UTC）に `/api/keepalive` を叩き、`prisma.event.count()` で DB への疎通を維持する。
+
+エンドポイントは `CRON_SECRET` 環境変数で保護されており、`Authorization: Bearer <CRON_SECRET>` ヘッダーがない場合は 401 を返す。Vercel はクロン実行時にこのヘッダーを自動付与する。
+
+**Vercel に設定が必要な環境変数:**
+
+```
+CRON_SECRET="openssl rand -hex 32 で生成したランダム文字列"
+```
 
 ## DBスキーマ概要
 
