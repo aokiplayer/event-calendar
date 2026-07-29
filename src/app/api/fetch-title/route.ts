@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/session";
+import { isIP } from "node:net";
+import { lookup } from "node:dns/promises";
 
 const PRIVATE_IP_PATTERNS = [
   /^localhost$/i,
@@ -9,10 +11,20 @@ const PRIVATE_IP_PATTERNS = [
   /^172\.(1[6-9]|2\d|3[01])\./,
   /^192\.168\./,
   /^169\.254\./,   // AWS メタデータ等のリンクローカル
+  /^0\./,          // "現在のネットワーク"
+  /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // CGNAT 100.64.0.0/10
   /^::1$/,         // IPv6 ループバック
-  /^fc00:/i,       // IPv6 プライベート
+  /^::$/,          // IPv6 unspecified
+  /^f[cd][0-9a-f]{2}:/i, // IPv6 プライベート fc00::/7
   /^fe80:/i,       // IPv6 リンクローカル
 ];
+
+function isPrivateAddress(hostname: string): boolean {
+  // IPv4-mapped IPv6 (::ffff:127.0.0.1 等) は内側の IPv4 部分を検証する
+  const mapped = hostname.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  const target = mapped ? mapped[1] : hostname;
+  return PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(target));
+}
 
 function isSafeUrl(urlString: string): boolean {
   let parsed: URL;
@@ -26,12 +38,30 @@ function isSafeUrl(urlString: string): boolean {
     return false;
   }
 
-  const hostname = parsed.hostname;
-  if (PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(hostname))) {
+  if (isPrivateAddress(parsed.hostname)) {
     return false;
   }
 
   return true;
+}
+
+// DNS リバインディング対策: isSafeUrl() はホスト名の文字列しか見ておらず、
+// 「一見安全な外部ドメインだが名前解決すると内部/プライベートIPを指す」ケースを
+// すり抜けられる。fetch() が使うのと同じ名前解決結果を事前に検証する。
+// （名前解決から実際の fetch までの間に DNS 応答が切り替わる極小の TOCTOU
+// ウィンドウは残るが、静的な悪意ある DNS レコードによる攻撃は防げる）
+async function resolvesToPrivateAddress(hostname: string): Promise<boolean> {
+  if (isIP(hostname)) {
+    return isPrivateAddress(hostname);
+  }
+
+  try {
+    const addresses = await lookup(hostname, { all: true, verbatim: true });
+    return addresses.some((a) => isPrivateAddress(a.address));
+  } catch {
+    // 名前解決できない場合は安全側に倒して拒否
+    return true;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -47,6 +77,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (!isSafeUrl(url)) {
+    return NextResponse.json({ error: "Invalid url" }, { status: 400 });
+  }
+
+  const hostname = new URL(url).hostname;
+  if (await resolvesToPrivateAddress(hostname)) {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 });
   }
 
