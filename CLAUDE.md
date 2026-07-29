@@ -87,12 +87,21 @@ CRON_SECRET="openssl rand -hex 32 で生成したランダム文字列"
 
 ## セキュリティ上の注意点
 
+### Supabase の Row Level Security（RLS）
+
+Supabase は `public` スキーマの全テーブルを PostgREST 経由で自動的に REST API 公開する。RLS が無効なテーブルは `anon` キーだけで直接 SELECT/INSERT/UPDATE/DELETE が可能になり、アプリ側の iron-session 認証（POST/PUT/DELETE はログイン必須）を完全にバイパスできてしまう（Supabase の "Table is publicly accessible" 警告はこれを指す）。
+
+`Event` / `RelatedUrl` の両テーブルは RLS を有効化済み（ポリシーは意図的に未設定＝デフォルト全拒否）。Prisma（`DATABASE_URL`）はテーブルオーナー権限で接続しているため RLS の影響を受けず、アプリの動作に影響はない。マイグレーションは `prisma/migrations/20260729043429_enable_row_level_security/`。
+
+**新しいテーブルを追加した場合は、必ず同様に RLS を有効化すること。** そうしないと同じ形で公開されてしまう。
+
 ### fetch-title API の SSRF 対策
 
-`/api/fetch-title` はユーザー指定の URL を fetch してタイトルを取得するため、SSRF（Server-Side Request Forgery）のリスクがある。以下の2段構えで対策している。
+`/api/fetch-title` はユーザー指定の URL を fetch してタイトルを取得するため、SSRF（Server-Side Request Forgery）のリスクがある。以下の対策をしている。
 
-1. **`isSafeUrl()`** — プライベート IP・ループバック・リンクローカルアドレスへのリクエストを弾く
-2. **`redirect: "error"`** — HTTP リダイレクトを一切追わない。`redirect: "follow"` にすると、攻撃者が外部 URL からプライベート IP へリダイレクトさせることで上記チェックをバイパスできるため禁止
+1. **`isSafeUrl()`** — プライベート IP・ループバック・リンクローカルアドレス（CGNAT・IPv4-mapped IPv6 なども含む）へのリクエストを弾く
+2. **`resolvesToPrivateAddress()`** — `isSafeUrl()` はホスト名の文字列しか見ておらず、「一見安全な外部ドメインだが名前解決すると内部/プライベートIPを指す」DNS リバインディングをすり抜けられる。`dns.lookup()` で実際の名前解決結果を検証してから fetch する
+3. **`redirect: "error"`** — HTTP リダイレクトを一切追わない。`redirect: "follow"` にすると、攻撃者が外部 URL からプライベート IP へリダイレクトさせることで上記チェックをバイパスできるため禁止
 
 この設定を変更する場合は SSRF リスクを十分に考慮すること。
 
