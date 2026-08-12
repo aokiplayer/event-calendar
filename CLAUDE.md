@@ -40,6 +40,39 @@ npx prisma migrate dev       # マイグレーション作成（本番向け）
 
 スキーマ変更後は必ず `prisma generate` を実行して開発サーバーを再起動すること。
 
+### ⚠️ `db push` / `migrate` を安易に実行しないこと
+
+2つの問題があり、上記コマンドはそのままでは危険：
+
+1. **`.env` の `DATABASE_URL` が本番 Supabase を指している**（`...pooler.supabase.com:6543`）。ローカル Postgres の URL は残っていないため、`db push` を叩くと本番に DDL が流れる。しかも 6543 はトランザクションプーラで、Prisma の `migrate` / `db push` は直結（5432）を要求するため、アドバイザリロックが効かずハングや中途半端な適用が起きうる
+2. **`prisma/migrations/` が schema.prisma とドリフトしている**。`init` には既に存在しない `reportUrl` カラムがあり、`RelatedUrl` テーブルを作るマイグレーションが存在しない（`db push` で適用され記録されなかった）。`db push` は差分全体を見るため、本番に `reportUrl` が残っていれば `DROP COLUMN` を含む破壊的差分になる
+
+**当面は、追加専用の DDL を Supabase の SQL エディタ（直結セッション）で手で流し、ローカルでは `prisma generate` だけ実行する**（`generate` は schema.prisma を読むだけで DB に接続しない）。`--accept-data-loss` は破壊的差分を承認するフラグなので使わない。
+
+適用済みの手書き DDL：
+
+```sql
+-- 2026-08-12 種別「情報」と投稿者名を追加（2文を別々に実行すること）
+ALTER TYPE "EventType" ADD VALUE IF NOT EXISTS 'INFO';
+ALTER TABLE "Event" ADD COLUMN IF NOT EXISTS "postedBy" TEXT;
+```
+
+Postgres は同一トランザクション内で追加した enum 値をそのトランザクション内で*使う*ことを禁じる。追加するだけなら問題ないが、念のため実行を分ける。`ADD COLUMN`（NOT NULL・DEFAULT なし）はカタログ更新のみでテーブル書き換えが起きず、既存行は NULL になる。
+
+本来は `prisma migrate diff --from-empty --to-url` で本番からベースラインを作り直し、`prisma migrate resolve --applied` で既適用扱いにしてドリフトを解消すべき（未対応）。
+
+### 本番を踏まずに動作確認する
+
+`docker compose up -d` でローカル Postgres を立て、`.env.local` で `DATABASE_URL` を上書きする（`.env` は触らない）。
+
+**`.env.local` を置いても Prisma CLI は `.env`＝本番を向いたまま**なので、ローカルに流すときは `--url` で接続先を明示すること。
+
+```bash
+npx prisma db push --url "postgresql://postgres:postgres@localhost:5432/event_calendar"
+```
+
+構成図・環境変数の解決経路・本番との差分の一覧は [docs/development-environment.md](docs/development-environment.md) を参照。
+
 ## ディレクトリ構成
 
 ```
@@ -107,7 +140,13 @@ Supabase は `public` スキーマの全テーブルを PostgREST 経由で自�
 
 ## DBスキーマ概要
 
-- `Event`: イベント本体（url, title, startDate, endDate, type, description）
+- `Event`: イベント本体（url, title, startDate, endDate, type, description, postedBy）
 - `RelatedUrl`: 関連URL（url, urlType）、Event に cascade 削除
-- `EventType`: `SPEAKER`（登壇）/ `ATTENDEE`（参加）
+- `EventType`: `SPEAKER`（登壇）/ `ATTENDEE`（参加）/ `INFO`（情報）
 - `RelatedUrlType`: `REPORT` / `SLIDES` / `VIDEO` / `OTHER`
+
+`INFO` は「自分は参加しないが面白そうなイベント」を共有するための種別。参加のコミットなしで投稿できるようにして、投稿のハードルを下げる目的で追加した。
+
+`postedBy` は投稿者名（nullable）。認証は全員共有の固定ID/パスワードで identity を持たないため、フォームの自由入力にして `localStorage`（キー `event-calendar.postedBy`）に記憶する方式にしている。**編集時は localStorage を参照せず、書き込みも新規作成時のみ**（他人の投稿を編集したときに名前が入れ替わるのを防ぐため）。
+
+種別ごとのラベルと色は `src/types/event.ts` の `EVENT_TYPE_LABELS` / `EVENT_TYPE_COLORS` に集約してある。**新しい種別を追加するときは三項演算子で分岐せずこの定数に追加すること**（`Record<EventType, ...>` なので漏れがあれば型エラーになる）。色は FullCalendar が hex を要求するため 16 進数で一元管理し、Tailwind のクラスは併用しない。
