@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Event } from "@/types/event";
-import { RELATED_URL_TYPE_LABELS } from "@/types/event";
+import { EVENT_TYPE_COLORS, EVENT_TYPE_LABELS, RELATED_URL_TYPE_LABELS } from "@/types/event";
 import { EventFormModal } from "@/components/EventFormModal";
 
 type Props = {
@@ -65,13 +65,14 @@ export function EventDetailModal({ event, isLoggedIn, onClose, onDeleted, onUpda
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <span
-            className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
-              event.type === "SPEAKER"
-                ? "bg-orange-100 text-orange-700"
-                : "bg-teal-100 text-teal-700"
-            }`}
+            className="text-xs font-medium px-2.5 py-0.5 rounded-full"
+            style={{
+              // 単一の hex から淡色の背景を導出する（末尾の 1a は不透明度 10%）
+              backgroundColor: `${EVENT_TYPE_COLORS[event.type].bg}1a`,
+              color: EVENT_TYPE_COLORS[event.type].border,
+            }}
           >
-            {event.type === "SPEAKER" ? "登壇" : "参加"}
+            {EVENT_TYPE_LABELS[event.type]}
           </span>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
@@ -97,6 +98,13 @@ export function EventDetailModal({ event, isLoggedIn, onClose, onDeleted, onUpda
             <span className="font-medium text-gray-700">開催日：</span>
             {isSingleDay ? start : `${start} 〜 ${end}`}
           </div>
+
+          {event.postedBy && (
+            <div className="text-sm text-gray-600">
+              <span className="font-medium text-gray-700">投稿者：</span>
+              {event.postedBy}
+            </div>
+          )}
 
           {event.description && (
             <div>

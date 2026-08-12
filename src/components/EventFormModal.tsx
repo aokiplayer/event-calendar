@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Event, EventType, RelatedUrlType, RelatedUrlEntry } from "@/types/event";
-import { RELATED_URL_TYPE_LABELS } from "@/types/event";
+import { EVENT_TYPE_ENTRIES, RELATED_URL_TYPE_LABELS } from "@/types/event";
 import { dateInputToUTC, utcToDateInput, exclusiveToInclusiveDate } from "@/lib/date-utils";
 
 type Props = {
@@ -13,6 +13,27 @@ type Props = {
 };
 
 const URL_TYPES = Object.entries(RELATED_URL_TYPE_LABELS) as [RelatedUrlType, string][];
+
+// 認証は全員共有のため誰が投稿したか判別できない。名前は自由入力し、次回のためにブラウザへ記憶する
+const POSTED_BY_KEY = "event-calendar.postedBy";
+
+function readRememberedPostedBy(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(POSTED_BY_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberPostedBy(name: string) {
+  try {
+    if (name) localStorage.setItem(POSTED_BY_KEY, name);
+    else localStorage.removeItem(POSTED_BY_KEY);
+  } catch {
+    // プライベートブラウジングなどで書き込めない場合は記憶を諦める（保存自体は成功している）
+  }
+}
 
 export function EventFormModal({ initialDates, event, onClose, onSaved }: Props) {
   const isEditing = !!event;
@@ -32,6 +53,10 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
   );
   const [type, setType] = useState<EventType>(event?.type ?? "ATTENDEE");
   const [description, setDescription] = useState(event?.description ?? "");
+  // 編集時は記憶した名前を使わない（他人の投稿に自分の名前が入ってしまうため）
+  const [postedBy, setPostedBy] = useState(() =>
+    event ? (event.postedBy ?? "") : readRememberedPostedBy()
+  );
   const [relatedUrls, setRelatedUrls] = useState<RelatedUrlEntry[]>(
     event?.relatedUrls.map((r) => ({ url: r.url, urlType: r.urlType })) ??
       [{ url: "", urlType: "REPORT" }]
@@ -67,6 +92,7 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
     if (!url || !title || !startDate || !endDate) return;
     setSaving(true);
     setError(null);
+    const trimmedPostedBy = postedBy.trim();
     try {
       const payload = {
         url,
@@ -75,6 +101,7 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
         endDate: dateInputToUTC(endDate),
         type,
         description: description || null,
+        postedBy: trimmedPostedBy || null,
         relatedUrls: relatedUrls.filter((r) => r.url),
       };
       const res = isEditing
@@ -93,6 +120,8 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
         setError("保存に失敗しました。もう一度お試しください。");
         return;
       }
+      // 編集では記憶を更新しない（他人の投稿を直したときに自分の名前が上書きされるのを防ぐ）
+      if (!isEditing) rememberPostedBy(trimmedPostedBy);
       onSaved();
     } catch {
       setError("通信エラーが発生しました。");
@@ -178,20 +207,37 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">種別</label>
             <div className="flex gap-3">
-              {(["ATTENDEE", "SPEAKER"] as EventType[]).map((t) => (
-                <label key={t} className="flex items-center gap-2 text-sm cursor-pointer">
+              {EVENT_TYPE_ENTRIES.map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="radio"
                     name="type"
-                    value={t}
-                    checked={type === t}
-                    onChange={() => setType(t)}
+                    value={value}
+                    checked={type === value}
+                    onChange={() => setType(value)}
                     className="accent-blue-600"
                   />
-                  {t === "SPEAKER" ? "登壇" : "参加"}
+                  {label}
                 </label>
               ))}
             </div>
+            <p className="text-xs text-gray-400 mt-1">
+              「情報」は参加・登壇しないイベントの共有に使えます
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              投稿者名 <span className="text-xs text-gray-400">任意</span>
+            </label>
+            <input
+              type="text"
+              value={postedBy}
+              onChange={(e) => setPostedBy(e.target.value)}
+              maxLength={50}
+              placeholder="例：青木"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           <div>

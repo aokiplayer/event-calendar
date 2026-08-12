@@ -8,6 +8,7 @@ import type { DateSelectArg, EventClickArg } from "@fullcalendar/core";
 import { EventFormModal } from "@/components/EventFormModal";
 import { EventDetailModal } from "@/components/EventDetailModal";
 import type { Event } from "@/types/event";
+import { EVENT_TYPE_COLORS, EVENT_TYPE_ENTRIES } from "@/types/event";
 import { inclusiveToExclusiveDate } from "@/lib/date-utils";
 import { useRouter } from "next/navigation";
 
@@ -40,15 +41,18 @@ export default function CalendarPage() {
       .then((d) => setIsLoggedIn(d.isLoggedIn === true));
   }, [fetchEvents]);
 
-  const calendarEvents = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    start: e.startDate,
-    end: inclusiveToExclusiveDate(e.endDate),
-    allDay: true,
-    backgroundColor: e.type === "SPEAKER" ? "#f97316" : "#0d9488",
-    borderColor: e.type === "SPEAKER" ? "#ea580c" : "#0f766e",
-  }));
+  const calendarEvents = events.map((e) => {
+    const colors = EVENT_TYPE_COLORS[e.type];
+    return {
+      id: e.id,
+      title: e.title,
+      start: e.startDate,
+      end: inclusiveToExclusiveDate(e.endDate),
+      allDay: true,
+      backgroundColor: colors.bg,
+      borderColor: colors.border,
+    };
+  });
 
   const handleDateSelect = (arg: DateSelectArg) => {
     setSelectedDates({ start: arg.startStr, end: arg.endStr });
@@ -108,14 +112,15 @@ export default function CalendarPage() {
         )}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-orange-500 inline-block" />
-              登壇
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-teal-600 inline-block" />
-              参加
-            </span>
+            {EVENT_TYPE_ENTRIES.map(([value, label]) => (
+              <span key={value} className="flex items-center gap-1.5">
+                <span
+                  className="w-3 h-3 rounded-sm inline-block"
+                  style={{ backgroundColor: EVENT_TYPE_COLORS[value].bg }}
+                />
+                {label}
+              </span>
+            ))}
           </div>
           <FullCalendar
             ref={calendarRef}

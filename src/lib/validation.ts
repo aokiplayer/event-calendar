@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const eventTypeSchema = z.enum(["SPEAKER", "ATTENDEE"]);
+export const eventTypeSchema = z.enum(["SPEAKER", "ATTENDEE", "INFO"]);
 
 export const relatedUrlTypeSchema = z.enum(["REPORT", "SLIDES", "VIDEO", "OTHER"]);
 
@@ -16,5 +16,6 @@ export const eventSchema = z.object({
   endDate: z.string().datetime(),
   type: eventTypeSchema,
   description: z.string().nullable().optional(),
+  postedBy: z.string().trim().max(50).nullable().optional(),
   relatedUrls: z.array(relatedUrlSchema).optional().default([]),
 });

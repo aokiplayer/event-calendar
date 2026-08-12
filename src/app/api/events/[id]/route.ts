@@ -34,7 +34,7 @@ export async function PUT(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { url, title, startDate, endDate, type, description, relatedUrls } = parsed.data;
+  const { url, title, startDate, endDate, type, description, postedBy, relatedUrls } = parsed.data;
 
   const event = await prisma.event.update({
     where: { id },
@@ -45,6 +45,7 @@ export async function PUT(
       endDate: new Date(endDate),
       type,
       description: description ?? null,
+      postedBy: postedBy ?? null,
       relatedUrls: {
         deleteMany: {},
         create: relatedUrls.map((r) => ({ url: r.url, urlType: r.urlType })),

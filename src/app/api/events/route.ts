@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { url, title, startDate, endDate, type, description, relatedUrls } = parsed.data;
+  const { url, title, startDate, endDate, type, description, postedBy, relatedUrls } = parsed.data;
 
   const event = await prisma.event.create({
     data: {
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       endDate: new Date(endDate),
       type,
       description: description ?? null,
+      postedBy: postedBy ?? null,
       relatedUrls: {
         create: relatedUrls.map((r) => ({ url: r.url, urlType: r.urlType })),
       },
