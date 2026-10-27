@@ -64,6 +64,14 @@ async function resolvesToPrivateAddress(hostname: string): Promise<boolean> {
   }
 }
 
+// Content-Encoding は "gzip, br" のように複数指定できるので、トークン単位で見る
+function hasBrotliEncoding(contentEncoding: string | null): boolean {
+  if (!contentEncoding) return false;
+  return contentEncoding
+    .split(",")
+    .some((token) => token.trim().toLowerCase() === "br");
+}
+
 export async function GET(req: NextRequest) {
   const authRes = NextResponse.next();
   const session = await getIronSession<SessionData>(req, authRes, sessionOptions);
@@ -87,10 +95,23 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; EventCalendarBot/1.0)" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; EventCalendarBot/1.0)",
+        // br を要求しない（まともなサーバーはこれで br を返さなくなる）
+        "Accept-Encoding": "gzip, deflate",
+      },
       signal: AbortSignal.timeout(5000),
       redirect: "error",
     });
+
+    // CVE-2026-111497（Node.js の Brotli デコーダの境界外書き込み）対策の多重防御。
+    // fetch() は Content-Encoding: br を本文の読み出し時に自動展開するため、
+    // 攻撃者のサイトが要求を無視して br を返してきた場合は本文を読まずに捨てる。
+    // 根本対策は修正済みランタイム（engines で Node 24.x を指定）への更新。
+    if (hasBrotliEncoding(res.headers.get("content-encoding"))) {
+      await res.body?.cancel();
+      return NextResponse.json({ title: "" });
+    }
 
     if (!res.ok) {
       return NextResponse.json({ title: "" });
