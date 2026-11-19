@@ -72,6 +72,43 @@ function hasBrotliEncoding(contentEncoding: string | null): boolean {
     .some((token) => token.trim().toLowerCase() === "br");
 }
 
+const MAX_REDIRECTS = 5;
+
+// リダイレクトは自前で 1 ホップずつ追い、遷移先ごとに isSafeUrl() と
+// resolvesToPrivateAddress() を検証し直す。redirect: "follow" に任せると
+// 外部 URL からプライベート IP へ飛ばされたときに検証をすり抜けるため使わない。
+// 一方 redirect: "error" だと http→https や末尾スラッシュ補完のような
+// ごく普通のリダイレクトでもタイトルが取れなくなる。
+// 遷移先が危険・リダイレクトが多すぎる・Location が無い場合は null を返す。
+async function fetchFollowingSafeRedirects(startUrl: string): Promise<Response | null> {
+  const signal = AbortSignal.timeout(5000); // 全ホップ合計のタイムアウト
+  let current = startUrl;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!isSafeUrl(current)) return null;
+    if (await resolvesToPrivateAddress(new URL(current).hostname)) return null;
+
+    const res = await fetch(current, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; EventCalendarBot/1.0)",
+        // br を要求しない（まともなサーバーはこれで br を返さなくなる）
+        "Accept-Encoding": "gzip, deflate",
+      },
+      signal,
+      redirect: "manual",
+    });
+
+    if (res.status < 300 || res.status >= 400) return res;
+
+    await res.body?.cancel();
+    const location = res.headers.get("location");
+    if (!location) return null;
+    current = new URL(location, current).toString();
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const authRes = NextResponse.next();
   const session = await getIronSession<SessionData>(req, authRes, sessionOptions);
@@ -94,15 +131,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; EventCalendarBot/1.0)",
-        // br を要求しない（まともなサーバーはこれで br を返さなくなる）
-        "Accept-Encoding": "gzip, deflate",
-      },
-      signal: AbortSignal.timeout(5000),
-      redirect: "error",
-    });
+    const res = await fetchFollowingSafeRedirects(url);
+    if (!res) {
+      return NextResponse.json({ title: "" });
+    }
 
     // CVE-2026-111497（Node.js の Brotli デコーダの境界外書き込み）対策の多重防御。
     // fetch() は Content-Encoding: br を本文の読み出し時に自動展開するため、

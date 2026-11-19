@@ -41,6 +41,7 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
   const [url, setUrl] = useState(event?.url ?? "");
   const [title, setTitle] = useState(event?.title ?? "");
   const [fetchingTitle, setFetchingTitle] = useState(false);
+  const [titleFetchFailed, setTitleFetchFailed] = useState(false);
   const [startDate, setStartDate] = useState(
     event ? utcToDateInput(event.startDate) : (initialDates?.start ?? "")
   );
@@ -72,10 +73,14 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
   async function handleUrlBlur() {
     if (!url || title) return;
     setFetchingTitle(true);
+    setTitleFetchFailed(false);
     try {
       const res = await fetch(`/api/fetch-title?url=${encodeURIComponent(url)}`);
       const data = await res.json();
       if (data.title) setTitle(data.title);
+      else setTitleFetchFailed(true);
+    } catch {
+      setTitleFetchFailed(true);
     } finally {
       setFetchingTitle(false);
     }
@@ -165,7 +170,10 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setTitleFetchFailed(false);
+                }}
                 placeholder={fetchingTitle ? "取得中..." : "イベントタイトル"}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
@@ -174,6 +182,11 @@ export function EventFormModal({ initialDates, event, onClose, onSaved }: Props)
                 <span className="absolute right-3 top-2.5 text-xs text-gray-400">取得中...</span>
               )}
             </div>
+            {titleFetchFailed && !title && (
+              <p className="mt-1 text-xs text-gray-500">
+                このページからはタイトルを自動取得できませんでした。手入力してください。
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

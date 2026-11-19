@@ -134,7 +134,9 @@ Supabase は `public` スキーマの全テーブルを PostgREST 経由で自�
 
 1. **`isSafeUrl()`** — プライベート IP・ループバック・リンクローカルアドレス（CGNAT・IPv4-mapped IPv6 なども含む）へのリクエストを弾く
 2. **`resolvesToPrivateAddress()`** — `isSafeUrl()` はホスト名の文字列しか見ておらず、「一見安全な外部ドメインだが名前解決すると内部/プライベートIPを指す」DNS リバインディングをすり抜けられる。`dns.lookup()` で実際の名前解決結果を検証してから fetch する
-3. **`redirect: "error"`** — HTTP リダイレクトを一切追わない。`redirect: "follow"` にすると、攻撃者が外部 URL からプライベート IP へリダイレクトさせることで上記チェックをバイパスできるため禁止
+3. **`redirect: "manual"` で 1 ホップずつ追う（`fetchFollowingSafeRedirects()`）** — 遷移先ごとに 1・2 を検証し直し、最大 5 ホップ・全体 5 秒で打ち切る。`redirect: "follow"` に任せると、攻撃者が外部 URL からプライベート IP へリダイレクトさせることで上記チェックをバイパスできるため禁止。以前は `redirect: "error"` で一切追わなかったが、http→https や末尾スラッシュ補完などの普通のリダイレクトでもタイトルが取れなくなっていたため 2026-11-19 に変更した
+
+なお connpass は AWS WAF のボット対策（`202` + `x-amzn-waf-action: challenge`、本文なし）を返すため、サーバーからはタイトルを取得できない。チャレンジの回避はしない方針で、フォームに「手入力してください」と表示している。
 
 この設定を変更する場合は SSRF リスクを十分に考慮すること。
 
