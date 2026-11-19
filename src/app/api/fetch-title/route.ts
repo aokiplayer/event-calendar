@@ -3,6 +3,7 @@ import { getIronSession } from "iron-session";
 import { sessionOptions, type SessionData } from "@/lib/session";
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
+import { fetchConnpassTitle, isConnpassUrl, parseConnpassEventId } from "@/lib/connpass";
 
 const PRIVATE_IP_PATTERNS = [
   /^localhost$/i,
@@ -80,11 +81,15 @@ const MAX_REDIRECTS = 5;
 // 一方 redirect: "error" だと http→https や末尾スラッシュ補完のような
 // ごく普通のリダイレクトでもタイトルが取れなくなる。
 // 遷移先が危険・リダイレクトが多すぎる・Location が無い場合は null を返す。
-async function fetchFollowingSafeRedirects(startUrl: string): Promise<Response | null> {
+// 遷移先が connpass なら HTML を取りに行かず、その URL を返す（API で引くため）。
+type FetchResult = { response: Response } | { connpassUrl: string } | null;
+
+async function fetchFollowingSafeRedirects(startUrl: string): Promise<FetchResult> {
   const signal = AbortSignal.timeout(5000); // 全ホップ合計のタイムアウト
   let current = startUrl;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (isConnpassUrl(current)) return { connpassUrl: current };
     if (!isSafeUrl(current)) return null;
     if (await resolvesToPrivateAddress(new URL(current).hostname)) return null;
 
@@ -98,7 +103,7 @@ async function fetchFollowingSafeRedirects(startUrl: string): Promise<Response |
       redirect: "manual",
     });
 
-    if (res.status < 300 || res.status >= 400) return res;
+    if (res.status < 300 || res.status >= 400) return { response: res };
 
     await res.body?.cancel();
     const location = res.headers.get("location");
@@ -125,16 +130,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 });
   }
 
-  const hostname = new URL(url).hostname;
-  if (await resolvesToPrivateAddress(hostname)) {
+  if (!isConnpassUrl(url) && (await resolvesToPrivateAddress(new URL(url).hostname))) {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 });
   }
 
   try {
-    const res = await fetchFollowingSafeRedirects(url);
-    if (!res) {
+    const result = await fetchFollowingSafeRedirects(url);
+    if (!result) {
       return NextResponse.json({ title: "" });
     }
+
+    // connpass はスクレイピング禁止のため HTML は取りに行かず、公式 API だけを使う
+    if ("connpassUrl" in result) {
+      const eventId = parseConnpassEventId(result.connpassUrl);
+      const title = eventId ? await fetchConnpassTitle(eventId) : null;
+      return NextResponse.json({ title: title ?? "" });
+    }
+
+    const res = result.response;
 
     // CVE-2026-111497（Node.js の Brotli デコーダの境界外書き込み）対策の多重防御。
     // fetch() は Content-Encoding: br を本文の読み出し時に自動展開するため、

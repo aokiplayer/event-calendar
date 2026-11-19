@@ -30,6 +30,8 @@ SESSION_SECRET="32文字以上のランダムな文字列"
 
 本番（Vercel）では上記に加えて `CRON_SECRET` も設定すること（後述）。
 
+任意で `CONNPASS_API_KEY`（connpass API v2 のキー）。設定すると connpass の URL でタイトルを API から取得する（後述）。ローカルで試すときは `.env.local` に書く（Docker の app コンテナでも Next.js が読む）。
+
 ## DB操作
 
 ```bash
@@ -136,7 +138,13 @@ Supabase は `public` スキーマの全テーブルを PostgREST 経由で自�
 2. **`resolvesToPrivateAddress()`** — `isSafeUrl()` はホスト名の文字列しか見ておらず、「一見安全な外部ドメインだが名前解決すると内部/プライベートIPを指す」DNS リバインディングをすり抜けられる。`dns.lookup()` で実際の名前解決結果を検証してから fetch する
 3. **`redirect: "manual"` で 1 ホップずつ追う（`fetchFollowingSafeRedirects()`）** — 遷移先ごとに 1・2 を検証し直し、最大 5 ホップ・全体 5 秒で打ち切る。`redirect: "follow"` に任せると、攻撃者が外部 URL からプライベート IP へリダイレクトさせることで上記チェックをバイパスできるため禁止。以前は `redirect: "error"` で一切追わなかったが、http→https や末尾スラッシュ補完などの普通のリダイレクトでもタイトルが取れなくなっていたため 2026-11-19 に変更した
 
-なお connpass は AWS WAF のボット対策（`202` + `x-amzn-waf-action: challenge`、本文なし）を返すため、サーバーからはタイトルを取得できない。チャレンジの回避はしない方針で、フォームに「手入力してください」と表示している。
+### connpass のタイトル取得（`src/lib/connpass.ts`）
+
+connpass は規約でスクレイピングを禁止しており（2024-09〜）、ページも AWS WAF のチャレンジ（`202` + `x-amzn-waf-action: challenge`、本文なし）を返す。そのため **connpass の URL（`connpass.com` とそのサブドメイン）は HTML を一切取りに行かず、公式 API v2（`GET /api/v2/events/?event_id=N`、`X-API-Key` ヘッダー）だけを使う**。リダイレクトの途中で connpass に入った場合も同じ。チャレンジの回避（UA 偽装など）はしない。
+
+- `CONNPASS_API_KEY` 未設定・イベント URL でない（グループのトップなど）・401/429 などのエラー → タイトルは空で返し、フォームが「手入力してください」と表示する
+- フリープランは 1 リクエスト/12 秒・100 リクエスト/日。URL 欄からフォーカスを外したときにしか呼ばないので通常は足りるが、超えると 429 になる（429 も日次の回数に数えられる）
+- ログには状態コードだけ出し、キーは出さない
 
 この設定を変更する場合は SSRF リスクを十分に考慮すること。
 

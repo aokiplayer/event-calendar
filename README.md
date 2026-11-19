@@ -74,6 +74,7 @@ http://localhost:3000 にアクセス。
 | `SITE_USERNAME` | ログインユーザー名 |
 | `SITE_PASSWORD` | ログインパスワード |
 | `SESSION_SECRET` | セッション暗号化キー（32文字以上） |
+| `CONNPASS_API_KEY` | 任意。[connpass API v2](https://connpass.com/about/api/v2/) のキー。設定すると connpass の URL でもタイトルを自動取得する（未設定なら手入力） |
 
 `SESSION_SECRET` の生成：
 
@@ -87,4 +88,4 @@ Vercel + Supabase を利用。
 
 1. [Supabase](https://supabase.com/) でプロジェクトを作成し、接続文字列を取得
 2. [Vercel](https://vercel.com/) に GitHub リポジトリを連携してデプロイ
-3. Vercel の環境変数に上記4つを設定
+3. Vercel の環境変数に上記を設定（`CONNPASS_API_KEY` は任意）
