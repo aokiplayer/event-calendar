@@ -21,12 +21,27 @@
 
 ## ローカル開発
 
-### 必要なもの
+### Docker だけで動かす（Node.js のインストール不要）
 
-- Node.js 20 以上
+```bash
+docker compose --profile app up    # DB と開発サーバーを起動 → http://localhost:3000（admin / password）
+```
+
+- 初回と `package-lock.json` が変わったときだけ、コンテナ内で `npm ci` が走る（`docker/app-entrypoint.sh`）
+- 接続先はコンテナの環境変数でローカル DB に固定しているので、`.env` が本番を指していても本番には繋がらない
+- 起動時に `prisma db push` をローカル DB にだけ流す
+- `node_modules` と `.next` は名前付きボリュームに置き、ホストとは共有しない
+- 任意のコマンド: `docker compose --profile app run --rm app npm run lint`
+- 停止: `docker compose --profile app down`（DB のデータも消すなら `-v`）
+
+### ホストの Node.js で動かす場合
+
+#### 必要なもの
+
+- Node.js 24.x
 - Docker
 
-### 起動手順
+#### 起動手順
 
 ```bash
 # 1. 依存パッケージのインストール
