@@ -95,7 +95,7 @@ src/
     date-utils.ts   # 日付変換ユーティリティ（UTC 基準）
   types/
     event.ts        # 型定義（validation.ts から z.infer で推論）
-  middleware.ts     # 認証ガード
+  proxy.ts          # 認証ガード（Next.js 16 で middleware.ts から改名。ランタイムは Node.js 固定）
 ```
 
 ## 重要な設計メモ
